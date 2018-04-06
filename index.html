@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>GREWordTest</title>
+    <link href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <script>window.$ = window.jQuery = require('./js/jquery-3.2.1.min.js');</script>
+    <script src="https://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+
+    <style type="text/css">
+      #heart{
+        position:absolute;
+        right:10px;
+        top:10px;
+      }
+      #testContainer{
+        display:none;
+      }
+      #word{
+        display:none;
+      }
+      #meaning{
+        display:none;
+        color:#FFFFFF;
+      }
+      #controlContainer{
+        display:none;
+      }
+      #mainContainer{
+        margin-right:20px;
+        margin-left:20px
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid" id="mainContainer">
+      <h2 class="text-center">Please Choose Test Scope</h2>
+      <form class="form-horizontal" name="scope" role="form">
+        <div class="form-group">
+          <div class="form-group">
+            <input type="number" name="from" class="form-control" placeholder="From">
+          </div>
+          <div class="form-group">
+            <input type="number" name="to" class="form-control" placeholder="To">
+          </div>
+          <div class="row-fluid">
+            <div class="col-md-9">
+              <button type="button" class="btn btn-primary btn-block" onclick="Start(scope)">Start</button>
+            </div>
+            <div class="col-md-3" >
+              <button type="button" class="btn btn-danger btn-block" onclick="ResetDB(scope)">ResetDB</button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="container-fluid" id="testContainer">
+      <div class="progress progress-striped active">
+        <div class="progress-bar progress-bar-success" id = "complete" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: 40%;">
+          <span>40</span>
+        </div>
+        <div class="progress-bar progress-bar-info" id = "learning" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: 30%;">
+          <span>30</span>
+        </div>
+        <div class="progress-bar progress-bar-danger" id = "hard" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: 20%;">
+          <span>20</span>
+        </div>
+        <div class="text-center" id="left">10</div>
+      </div>
+    </div>
+
+    <br>
+    <div class="container-fluid">
+      <h1 class="text-center" id="word">Word</h1>
+    </div>
+    <br>
+    <div class="container-fluid">
+      <h1 class="text-center text-success" id="meaning">单词</h1>
+    </div>
+
+    <br>
+    <br>
+    <br>
+
+    <div class="container-fluid text-center" id="controlContainer">
+      <button type="button" id="okButton" style= "margin:10px" class="btn btn-success btn-lg" onclick="Ok()">
+        <span class="glyphicon glyphicon-ok"></span>
+      </button>
+      <button type="button" id="removeButton" style= "margin:10px" class="btn btn-danger btn-lg" onclick="Remove()">
+        <span class="glyphicon glyphicon-remove"></span>
+      </button>
+    </div>
+
+    <button type="button" class="btn btn-default" id="heart" data-toggle="modal" data-target="#heartModal">
+      <span class="glyphicon glyphicon-heart-empty"></span>
+    </button>
+
+    <div class="modal fade" id="heartModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+            <h4 class="modal-title" id="myModalLabel">Please enter 4-digit password</h4>
+          </div>
+          <div class="modal-body">
+            <input type="password" id="password" class="form-control" placeholder="Password">
+            <div id="content"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" onclick="checkPassword(password)">Submit</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <script>
+      const MaxWordCount = 3281
+      var total = 0
+      var now = 0
+      var testWords = new Array()
+      var complete = 0
+      var learning = 0
+      var hard = 0
+      var left = 0
+
+      function sortNumberByScore(a, b){
+        return a.Score - b.Score
+      }
+
+      function TestForm(form){
+        if (form.from.value == null || form.from.valu == ""){
+          alert("Cannot be empty!")
+          return false
+        }
+        if (form.to.value == null || form.to.value == ""){
+          alert("Cannot be empty!")
+          return false
+        }
+        if (Number(form.from.value) <= 0){
+          alert("Cannot be less than one!")
+          return false
+        }
+        if (Number(form.to.value) > MaxWordCount){
+          alert("Cannot exceed the limit " + MaxWordCount)
+          return false
+        }
+        if (Number(form.from.value) > Number(form.to.value)){
+          alert("From cannot larger than To")
+          return false
+        }
+        return true
+      }
+
+      function Start(scope){
+        if (!TestForm(scope)) {
+          return
+        }
+        var query = require('./ask')
+        testWords = query.Ask(Number(scope.from.value), Number(scope.to.value))
+        console.log(testWords)
+        testWords.sort(sortNumberByScore)
+        total = testWords.length - 1
+        while (total >= 0 && testWords[total].Score >= 2){
+          testWords.pop()
+          total -= 1
+        }
+
+        total = testWords.length
+        if (total <= 0) {
+          alert("Great Little J! You have learned these words.")
+          return
+        }
+
+        now = Math.floor(total * Math.random())
+        complete = 0
+        learning = 0
+        hard = 0
+        for (var i = 0; i < total; ++i) {
+          if (testWords[i].Score == 1) {
+            learning += 1
+          }
+        }
+        for (var i = 0; i < total; ++i) {
+          if (testWords[i].Score == -1) {
+            hard += 1
+          }
+        }
+        left = total - learning - hard
+
+        var learningPercent = Math.round(learning / total * 100)
+        var hardPercent = Math.round(hard / total * 100)
+        document.getElementById("word").style.display = 'block'
+        document.getElementById("word").innerHTML = testWords[now].Word
+        document.getElementById("testContainer").style.display = 'block'
+        document.getElementById("complete").style = "width: 0%;"
+        document.getElementById("complete").innerHTML = '0'
+        document.getElementById("learning").style = "width: " + learningPercent + "%;"
+        document.getElementById("learning").innerHTML = learning
+        document.getElementById("hard").style = "width: " + hardPercent + "%;"
+        document.getElementById("hard").innerHTML = hard
+        document.getElementById("left").innerHTML = left
+        document.getElementById("controlContainer").style.display = 'block'
+        document.getElementById("meaning").style.display = 'block'
+        document.getElementById("meaning").style.color = '#FFFFFF'
+
+        document.getElementById("okButton").innerHTML = "<span class=\"glyphicon glyphicon-ok\"></span>"
+        document.getElementById("okButton").className = "btn btn-success btn-lg"
+        document.getElementById("okButton").onclick = function(){Ok()};
+        document.getElementById("okButton").removeAttribute("disabled");
+        document.getElementById("removeButton").innerHTML = "<span class=\"glyphicon glyphicon-remove\"></span>"
+        document.getElementById("removeButton").className = "btn btn-danger btn-lg"
+        document.getElementById("removeButton").onclick = function(){Remove()};
+      }
+
+      function ResetDB(scope){
+        if (!TestForm(scope)) {
+          return
+        }
+        var operate = require('./reset')
+        operate.ResetDB(Number(scope.from.value), Number(scope.to.value))
+        alert("Reset " + Number(scope.from.value) + " to " + Number(scope.to.value) + " successfully.")
+      }
+
+      function Ok(){
+        testWords[now].Score += 1
+        var query = require('./update')
+        query.Update(testWords[now]._id, testWords[now].Score)
+
+        document.getElementById("meaning").style.color = '#28a745';
+        document.getElementById("meaning").innerHTML = testWords[now].Meaning
+        document.getElementById("okButton").innerHTML = "<span class=\"glyphicon glyphicon-chevron-right\"></span>"
+        document.getElementById("okButton").className = "btn btn-warning btn-lg"
+        document.getElementById("okButton").onclick = function(){Next()};
+        document.getElementById("okButton").removeAttribute("disabled");
+
+        if (testWords[now].Score == 2) {
+          complete += 1
+          learning -= 1
+
+          var completePercent = Math.round(complete / total * 100)
+          document.getElementById("complete").style = "width: " + completePercent + "%;"
+          document.getElementById("complete").innerHTML = complete
+          var learningPercent = Math.round(learning / total * 100)
+          document.getElementById("learning").style = "width: " + learningPercent + "%;"
+          document.getElementById("learning").innerHTML = learning
+        }
+        else if (testWords[now].Score == 1){
+          learning += 1
+          left -= 1
+
+          var learningPercent = Math.round(learning / total * 100)
+          document.getElementById("learning").style = "width: " + learningPercent + "%;"
+          document.getElementById("learning").innerHTML = learning
+          document.getElementById("left").innerHTML = left
+        }
+        else {
+          testWords[now].Score += 1
+          query.Update(testWords[now]._id, testWords[now].Score)
+          hard -= 1
+          learning += 1
+
+          var learningPercent = Math.round(learning / total * 100)
+          document.getElementById("learning").style = "width: " + learningPercent + "%;"
+          document.getElementById("learning").innerHTML = learning
+          var hardPercent = Math.round(hard / total * 100)
+          document.getElementById("hard").style = "width: " + hardPercent + "%;"
+          document.getElementById("hard").innerHTML = hard
+        }
+      }
+
+      function Remove(){
+        var used = testWords[now].Score;
+        testWords[now].Score = -1
+        hard += 1
+        var query = require('./update')
+        query.Update(testWords[now]._id, testWords[now].Score)
+
+        document.getElementById("meaning").style.color = '#28a745';
+        document.getElementById("meaning").innerHTML = testWords[now].Meaning
+        document.getElementById("removeButton").innerHTML = "<span class=\"glyphicon glyphicon-chevron-right\"></span>"
+        document.getElementById("removeButton").className = "btn btn-warning btn-lg"
+        document.getElementById("removeButton").onclick = function(){Next()};
+        document.getElementById("okButton").disabled = "disabled";
+
+        if (used == 1) {
+          learning -= 1
+
+          var learningPercent = Math.round(learning / total * 100)
+          document.getElementById("learning").style = "width: " + learningPercent + "%;"
+          document.getElementById("learning").innerHTML = learning
+        }
+        else if (used == 2) {
+           complete -= 1
+
+           var completePercent = Math.round(complete / total * 100)
+           document.getElementById("complete").style = "width: " + completePercent + "%;"
+           document.getElementById("complete").innerHTML = complete
+        }
+        else if (used == 0) {
+          left -= 1
+
+          document.getElementById("left").innerHTML = left
+        }
+        else {
+          hard -= 1
+        }
+        var hardPercent = Math.round(hard / total * 100)
+        document.getElementById("hard").style = "width: " + hardPercent + "%;"
+        document.getElementById("hard").innerHTML = hard
+      }
+
+      function Next(){
+        if (testWords[now].Score >= 2) {
+          testWords.splice(now, 1)
+          console.log(testWords)
+        }
+        if (testWords.length <= 0) {
+          alert("Congratulations! Little J! You have finished " + total + " words.")
+          return
+        }
+
+        now = Math.floor(testWords.length * Math.random())
+        document.getElementById("word").innerHTML = testWords[now].Word
+        document.getElementById("meaning").style.color = '#FFFFFF'
+
+        document.getElementById("okButton").innerHTML = "<span class=\"glyphicon glyphicon-ok\"></span>"
+        document.getElementById("okButton").className = "btn btn-success btn-lg"
+        document.getElementById("okButton").onclick = function(){Ok()};
+        document.getElementById("okButton").removeAttribute("disabled");
+        document.getElementById("removeButton").innerHTML = "<span class=\"glyphicon glyphicon-remove\"></span>"
+        document.getElementById("removeButton").className = "btn btn-danger btn-lg"
+        document.getElementById("removeButton").onclick = function(){Remove()};
+      }
+
+      function checkPassword(password){
+        if (password.value != 1210)
+          alert("Password is wrong!")
+        else {
+          var letter = "<p> To 宝子：</p><p> 我一直都想给你做一个有用的软件，今天终于出现了GreWordTestv1.0，让你用它来背会3000GRE单词，考出好成绩！这个软件作为圣诞礼物送给你，希望宝宝好好使用，单词量突飞猛进。 </p><p> 从长春回来这些天，虽然我们还是会有生气，不开心，但是我们都克服解决了，越来越开心。收到了宝宝的手链，我会一直带着！没几天就要飞去LA了，不过这是我们俩的又一个新的开始，哥哥还是会一如既往的在你身后，永远爱你。</p><p class=\"text-right\"> 好哥 </p><p class=\"text-right\"> 2017.12.25 </p>"
+          document.getElementById("content").innerHTML = "<br><div class=\"panel panel-default\"><div class=\"panel-heading\"><h3 class=\"panel-title\">Merry Christmas!</h3></div><div class=\"panel-body\">" + letter + "</div></div>"
+        }
+      }
+    </script>
+  </body>
+</html>
